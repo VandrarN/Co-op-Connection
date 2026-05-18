@@ -172,6 +172,10 @@ else:
 
 clock = pygame.time.Clock()
 
+# TEMPORARY VISUAL STARTUP TEST
+# This deliberately draws a bright screen so we can confirm the deployed main.py is actually running.
+VISUAL_STARTUP_TEST = True
+
 def _compute_present_rect(win_size=None):
     if IS_WEB:
         return pygame.Rect(0, 0, W, H)
@@ -2211,6 +2215,23 @@ def handle_next():
         hot_unlock.start()
 
 def draw_title():
+    if VISUAL_STARTUP_TEST:
+        screen.fill((170, 35, 185))
+        pygame.draw.rect(screen, (255, 245, 120), pygame.Rect(80, 110, W - 160, 210), border_radius=28)
+        pygame.draw.rect(screen, (30, 20, 40), pygame.Rect(80, 110, W - 160, 210), width=8, border_radius=28)
+        dbg_font_big = pygame.font.SysFont(None, 64, bold=True)
+        dbg_font = pygame.font.SysFont(None, 40, bold=True)
+        line1 = dbg_font_big.render("MAIN.PY IS RUNNING", True, (20, 10, 30))
+        line2 = dbg_font.render("Visual startup test screen", True, (20, 10, 30))
+        line3 = dbg_font.render("If you see this, deployment and game loop work.", True, (20, 10, 30))
+        screen.blit(line1, line1.get_rect(center=(W // 2, 175)))
+        screen.blit(line2, line2.get_rect(center=(W // 2, 235)))
+        screen.blit(line3, line3.get_rect(center=(W // 2, 285)))
+        pygame.draw.rect(screen, (0, 255, 255), pygame.Rect(135, 390, W - 270, 120), border_radius=24)
+        msg = dbg_font.render("Press Enter to test GAME state", True, (0, 40, 60))
+        screen.blit(msg, msg.get_rect(center=(W // 2, 450)))
+        return
+
     draw_start_background()
 
     box1, box2 = get_title_name_boxes()
@@ -2404,6 +2425,18 @@ def draw_title():
             screen.blit(s, rect.topleft)
 
 def draw_game():
+    if VISUAL_STARTUP_TEST:
+        screen.fill((20, 120, 220))
+        pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(70, 110, W - 140, 220), border_radius=28)
+        pygame.draw.rect(screen, (10, 10, 50), pygame.Rect(70, 110, W - 140, 220), width=8, border_radius=28)
+        dbg_font_big = pygame.font.SysFont(None, 64, bold=True)
+        dbg_font = pygame.font.SysFont(None, 42, bold=True)
+        line1 = dbg_font_big.render("GAME STATE RUNNING", True, (10, 10, 50))
+        line2 = dbg_font.render("Enter key switched from title to game.", True, (10, 10, 50))
+        screen.blit(line1, line1.get_rect(center=(W // 2, 190)))
+        screen.blit(line2, line2.get_rect(center=(W // 2, 265)))
+        return
+
     draw_table_background()
 
     # All visible deck stacks are baked into the current table background.
