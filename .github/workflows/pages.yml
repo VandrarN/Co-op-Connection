@@ -27,11 +27,18 @@ jobs:
       - name: Install pygbag
         run: pip install pygbag
 
+      - name: Show repo files before build
+        run: |
+          echo "=== REPO FILES ==="
+          find . -maxdepth 3 -type f | sort
+
       - name: Build portrait web game
         run: python -m pygbag --build --width 900 --height 1350 .
 
-      - name: Show build output
-        run: find build -type f | sort
+      - name: Show build output after build
+        run: |
+          echo "=== BUILD FILES ==="
+          find build -type f | sort
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
