@@ -1,39 +1,86 @@
-#! src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" data-os="fs,snd,gui" data-python="3.12" data-_sdl2="canvas"
+name: Build and deploy Co-op Connection
 
-import pygame
-import asyncio
-import sys
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
-pygame.init()
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-W, H = 900, 1350
-screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Debug Test")
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-font_big = pygame.font.SysFont(None, 76, bold=True)
-font_small = pygame.font.SysFont(None, 42, bold=True)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-async def main():
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-        screen.fill((170, 35, 185))
+      - name: Install pygbag
+        run: pip install pygbag
 
-        pygame.draw.rect(screen, (255, 245, 120), pygame.Rect(70, 140, W - 140, 260), border_radius=30)
-        pygame.draw.rect(screen, (20, 10, 30), pygame.Rect(70, 140, W - 140, 260), width=8, border_radius=30)
+      - name: Build portrait web game
+        run: python -m pygbag --build --width 900 --height 1350 --ume_block 0 .
 
-        line1 = font_big.render("PYGAME STARTED", True, (20, 10, 30))
-        line2 = font_small.render("If you see this, main.py is running.", True, (20, 10, 30))
-        line3 = font_small.render("Canvas drawing works.", True, (20, 10, 30))
+      - name: Force fresh archive name
+        run: |
+          cp build/web/co-op-connection.tar.gz build/web/debug-main-test.tar.gz
 
-        screen.blit(line1, line1.get_rect(center=(W // 2, 220)))
-        screen.blit(line2, line2.get_rect(center=(W // 2, 300)))
-        screen.blit(line3, line3.get_rect(center=(W // 2, 355)))
+          python - <<'PY'
+          from pathlib import Path
 
-        pygame.display.flip()
-        await asyncio.sleep(0)
+          p = Path("build/web/index.html")
+          text = p.read_text()
 
-asyncio.run(main())
+          text = text.replace(
+              "co-op-connection.tar.gz",
+              "debug-main-test.tar.gz"
+          )
+
+          text = text.replace(
+              '"archive":"co-op-connection"',
+              '"archive":"debug-main-test"'
+          )
+
+          text = text.replace(
+              '"archive": "co-op-connection"',
+              '"archive": "debug-main-test"'
+          )
+
+          text = text.replace(
+              "archive: 'co-op-connection'",
+              "archive: 'debug-main-test'"
+          )
+
+          text = text.replace(
+              'archive: "co-op-connection"',
+              'archive: "debug-main-test"'
+          )
+
+          p.write_text(text)
+          PY
+
+          grep -n "debug-main-test" build/web/index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+
+    steps:
+      - name: Deploy
+        uses: actions/deploy-pages@v4
