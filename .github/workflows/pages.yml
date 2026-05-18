@@ -28,7 +28,7 @@ jobs:
         run: pip install pygbag
 
       - name: Build portrait web game
-        run: python -m pygbag --build --width 900 --height 1350 --ume_block 0 --template noctx.tmpl .
+        run: python -m pygbag --build --width 900 --height 1350 --ume_block 0 .
 
       - name: Verify debug text exists in build
         run: |
