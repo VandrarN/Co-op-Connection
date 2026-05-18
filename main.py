@@ -1627,7 +1627,8 @@ def _load_bg_image(filename: str):
     try:
         img = pygame.image.load(path)
 
-        # convert() can fail on pygbag/web for large PNGs
+        # convert() can fail on pygbag/web for large PNG backgrounds.
+        # If it fails, keep the loaded surface instead of falling back.
         try:
             img = img.convert()
         except Exception as conv_err:
@@ -1638,7 +1639,9 @@ def _load_bg_image(filename: str):
 
     except Exception as e:
         print(f"[BG LOAD] FAILED: {filename} -> {e}")
-        return None:
+        return None
+
+def _blit_cover(dst: pygame.Surface, img: pygame.Surface):
     """Draw a background onto dst.
 
     Replacement table art may not be exactly DESIGN_SIZE. Smooth-scaling that
