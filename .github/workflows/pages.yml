@@ -30,40 +30,15 @@ jobs:
       - name: Build portrait web game
         run: python -m pygbag --build --width 900 --height 1350 .
 
-      - name: Force debug archive in generated page
+      - name: Verify debug text exists in build
         run: |
-          cp build/web/co-op-connection.tar.gz build/web/debug-main-test.tar.gz
+          echo "=== SEARCHING GENERATED FILES ==="
 
-          echo "=== BEFORE ==="
-          grep -n "co-op-connection" build/web/index.html || true
+          find . -name "*.py" | sort
 
-          python - <<'PY'
-          from pathlib import Path
+          echo "=== SEARCH FOR DEBUG TEXT ==="
 
-          p = Path("build/web/index.html")
-          text = p.read_text()
-
-          text = text.replace("co-op-connection.tar.gz", "debug-main-test.tar.gz")
-          text = text.replace('archive":"co-op-connection"', 'archive":"debug-main-test"')
-          text = text.replace('archive": "co-op-connection"', 'archive": "debug-main-test"')
-          text = text.replace("archive='co-op-connection'", "archive='debug-main-test'")
-          text = text.replace('archive="co-op-connection"', 'archive="debug-main-test"')
-          text = text.replace("archive: 'co-op-connection'", "archive: 'debug-main-test'")
-          text = text.replace('archive: "co-op-connection"', 'archive: "debug-main-test"')
-
-          p.write_text(text)
-          PY
-
-          echo "=== AFTER ==="
-          grep -n "debug-main-test" build/web/index.html
-
-          if grep -q "co-op-connection.tar.gz" build/web/index.html; then
-            echo "ERROR: index.html still points to old archive"
-            exit 1
-          fi
-
-      - name: Show build output
-        run: find build/web -type f | sort
+          grep -R "MAIN.PY IS RUNNING" . || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
