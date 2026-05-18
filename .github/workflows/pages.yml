@@ -30,6 +30,19 @@ jobs:
       - name: Build game
         run: python -m pygbag --build --html --width 900 --height 1350 --ume_block 0 --CONSOLE 0 .
 
+      - name: Show build output
+        run: find build -maxdepth 4 -type f | sort
+
+      - name: Ensure expected archive filename exists
+        run: |
+          ARCHIVE_FILE=$(find build/web -name "*.tar.gz" | head -n 1)
+          echo "Found archive: $ARCHIVE_FILE"
+          if [ -z "$ARCHIVE_FILE" ]; then
+            echo "No .tar.gz archive found in build/web"
+            exit 1
+          fi
+          cp "$ARCHIVE_FILE" build/web/co-op-connection.tar.gz
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
