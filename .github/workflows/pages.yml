@@ -40,6 +40,11 @@ jobs:
           echo "=== BUILD FILES ==="
           find build -type f | sort
 
+      - name: Show archive contents
+        run: |
+          echo "=== ARCHIVE CONTENTS ==="
+          tar -tzf build/web/co-op-connection.tar.gz | sort
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
