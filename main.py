@@ -37,53 +37,36 @@ def _load_embedded_player_panel():
 def resource_path(relative: str) -> str:
     """Return a usable path for bundled assets.
 
-    Desktop runs usually keep files beside main.py. pygbag/web builds can mount
-    the same files at different virtual locations, and sometimes under an
-    assets/ prefix. This helper returns the first existing candidate, while
-    callers can still try extra candidates directly if needed.
+    In desktop Python the assets sit beside main.py. In pygbag/GitHub Pages the
+    archive can be unpacked with a slightly different working directory, so a
+    simple relative path may fail silently and fall back to the beige debug
+    background. This helper searches the common mounted locations before giving
+    up. It does not change any asset or visual design; it only finds the same
+    files reliably.
     """
     rel = relative.replace("\\", os.sep).replace("/", os.sep)
-    rel_forward = relative.replace("\\", "/")
-
     bases = []
     for b in (
         getattr(sys, "_MEIPASS", None),
         os.path.abspath(os.path.dirname(__file__)) if "__file__" in globals() else None,
         os.getcwd(),
-        "/",
         "/data/data/org.python/assets",
     ):
         if b and b not in bases:
             bases.append(b)
 
-    candidates = []
     for base in bases:
+        # pygbag unpacks app files under an assets/ directory in the browser.
+        # Try both the normal project-relative path and the browser archive path.
         for candidate in (
             os.path.join(base, rel),
             os.path.join(base, "assets", rel),
             os.path.join(base, "assets", os.path.basename(rel)),
         ):
-            if candidate not in candidates:
-                candidates.append(candidate)
-
-    # Also try browser/archive-relative paths exactly as pygbag commonly exposes them.
-    for candidate in (
-        rel_forward,
-        f"assets/{os.path.basename(rel_forward)}",
-        f"/assets/{os.path.basename(rel_forward)}",
-    ):
-        if candidate not in candidates:
-            candidates.append(candidate)
-
-    for candidate in candidates:
-        try:
             if os.path.exists(candidate):
                 return candidate
-        except Exception:
-            pass
 
-    # Last-resort search by filename. This is slow, but only happens if the
-    # normal expected paths fail. It helps in pygbag where mount points can shift.
+    # Last-resort browser archive search: find by the final filename.
     target = os.path.basename(rel)
     for base in bases:
         try:
@@ -93,7 +76,7 @@ def resource_path(relative: str) -> str:
         except Exception:
             pass
 
-    return candidates[0] if candidates else rel
+    return os.path.join(bases[0] if bases else os.getcwd(), rel)
 
 # --- Mirror coin button image cache ---
 _MIRROR_MINUS_IMG = None
@@ -1632,72 +1615,31 @@ SLOT_INDEX_TO_DECK_KEY = {
 
 
 def _load_bg_image(filename: str):
-    """Load a background image in both desktop Python and pygbag/web builds."""
-    rel = filename.replace("\\", "/")
-    basename = os.path.basename(rel)
+    """Load a background image if it exists (PyInstaller-safe)."""
+    path = resource_path(filename)
 
-    candidates = []
-    def add(path):
-        if path and path not in candidates:
-            candidates.append(path)
+    print(f"[BG LOAD] Trying: {path}")
 
-    # First try the resource helper result, then every common pygbag mount form.
-    add(resource_path(filename))
-    add(filename)
-    add(rel)
-    add(f"assets/{basename}")
-    add(f"/assets/{basename}")
-    add(os.path.join(os.getcwd(), filename))
-    add(os.path.join(os.getcwd(), "assets", basename))
-    if "__file__" in globals():
-        base = os.path.abspath(os.path.dirname(__file__))
-        add(os.path.join(base, filename))
-        add(os.path.join(base, "assets", basename))
-    add(os.path.join("/data/data/org.python/assets", filename))
-    add(os.path.join("/data/data/org.python/assets", "assets", basename))
+    if not os.path.exists(path):
+        print(f"[BG LOAD] Missing: {path}")
+        return None
 
-    last_error = None
-    for path in candidates:
+    try:
+        img = pygame.image.load(path)
+
+        # convert() can fail on pygbag/web for large PNG backgrounds.
+        # If it fails, keep the loaded surface instead of falling back.
         try:
-            exists = False
-            try:
-                exists = os.path.exists(path)
-            except Exception:
-                exists = False
+            img = img.convert()
+        except Exception as conv_err:
+            print(f"[BG LOAD] convert() failed for {filename}: {conv_err}")
 
-            # In pygbag, a direct pygame.image.load can sometimes work even when
-            # os.path.exists is unreliable, so we intentionally try both ways.
-            print(f"[BG LOAD] Trying {filename}: {path} exists={exists}")
-            img = pygame.image.load(path)
+        print(f"[BG LOAD] SUCCESS: {filename}")
+        return img
 
-            # convert() is optional here. If the browser surface rejects it, keep
-            # the loaded PNG surface instead of silently falling back.
-            try:
-                img = img.convert()
-            except Exception as conv_err:
-                print(f"[BG LOAD] convert() skipped for {filename}: {conv_err}")
-
-            print(f"[BG LOAD] SUCCESS {filename}: {path} size={img.get_size()}")
-            return img
-        except Exception as e:
-            last_error = e
-
-    # Pillow fallback for browser builds that can read the bytes but fail the
-    # normal pygame loader path. This keeps the surface usable without convert().
-    if Image is not None:
-        for path in candidates:
-            try:
-                if not os.path.exists(path):
-                    continue
-                pil = Image.open(path).convert("RGBA")
-                img = pygame.image.fromstring(pil.tobytes(), pil.size, "RGBA")
-                print(f"[BG LOAD] PIL SUCCESS {filename}: {path} size={img.get_size()}")
-                return img
-            except Exception as e:
-                last_error = e
-
-    print(f"[BG LOAD] FAILED {filename}. Last error: {last_error}")
-    return None
+    except Exception as e:
+        print(f"[BG LOAD] FAILED: {filename} -> {e}")
+        return None
 
 def _blit_cover(dst: pygame.Surface, img: pygame.Surface):
     """Draw a background onto dst.
