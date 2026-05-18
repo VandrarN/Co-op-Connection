@@ -1,0 +1,1 @@
+Upload all files to GitHub. Use GitHub Pages Source: GitHub Actions. This V7 build uses a direct 900x1350 pygame display surface for browser rendering.

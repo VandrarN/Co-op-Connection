@@ -1,0 +1,5 @@
+V10 browser deploy package
+
+Upload/replace these files in GitHub, including .github/workflows/pages.yml.
+This version builds with pygbag --html and removes vtx terminal from the Python script header so the game canvas is shown directly.
+Set GitHub Pages source to GitHub Actions.
