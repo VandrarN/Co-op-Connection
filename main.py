@@ -1615,16 +1615,30 @@ SLOT_INDEX_TO_DECK_KEY = {
 
 
 def _load_bg_image(filename: str):
-    """Load a background image if it exists (PyInstaller-safe). Returns Surface or None."""
+    """Load a background image if it exists (PyInstaller-safe)."""
     path = resource_path(filename)
+
+    print(f"[BG LOAD] Trying: {path}")
+
     if not os.path.exists(path):
-        return None
-    try:
-        return pygame.image.load(path).convert()
-    except Exception:
+        print(f"[BG LOAD] Missing: {path}")
         return None
 
-def _blit_cover(dst: pygame.Surface, img: pygame.Surface):
+    try:
+        img = pygame.image.load(path)
+
+        # convert() can fail on pygbag/web for large PNGs
+        try:
+            img = img.convert()
+        except Exception as conv_err:
+            print(f"[BG LOAD] convert() failed for {filename}: {conv_err}")
+
+        print(f"[BG LOAD] SUCCESS: {filename}")
+        return img
+
+    except Exception as e:
+        print(f"[BG LOAD] FAILED: {filename} -> {e}")
+        return None:
     """Draw a background onto dst.
 
     Replacement table art may not be exactly DESIGN_SIZE. Smooth-scaling that
