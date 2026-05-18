@@ -30,13 +30,24 @@ jobs:
       - name: Build portrait web game
         run: python -m pygbag --build --width 900 --height 1350 --ume_block 0 .
 
-      - name: Verify debug text exists in build
+      - name: Force fresh archive name
         run: |
-          echo "=== SEARCHING GENERATED FILES ==="
-          find . -name "*.py" | sort
+          cp build/web/co-op-connection.tar.gz build/web/debug-main-test.tar.gz
 
-          echo "=== SEARCH FOR DEBUG TEXT ==="
-          grep -R "MAIN.PY IS RUNNING" . || true
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("build/web/index.html")
+          text = p.read_text()
+          text = text.replace("co-op-connection.tar.gz", "debug-main-test.tar.gz")
+          text = text.replace('"archive":"co-op-connection"', '"archive":"debug-main-test"')
+          text = text.replace('"archive": "co-op-connection"', '"archive": "debug-main-test"')
+          text = text.replace("archive: 'co-op-connection'", "archive: 'debug-main-test'")
+          text = text.replace('archive: "co-op-connection"', 'archive: "debug-main-test"')
+          p.write_text(text)
+          PY
+
+          grep -n "debug-main-test" build/web/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
