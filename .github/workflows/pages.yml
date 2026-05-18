@@ -27,23 +27,32 @@ jobs:
       - name: Install pygbag
         run: pip install pygbag
 
-      - name: Show repo files before build
-        run: |
-          echo "=== REPO FILES ==="
-          find . -maxdepth 3 -type f | sort
-
       - name: Build portrait web game
         run: python -m pygbag --build --width 900 --height 1350 .
+
+      - name: Force fresh archive name
+        run: |
+          cp build/web/co-op-connection.tar.gz build/web/co-op-connection-debugtest.tar.gz
+
+          python - <<'PY'
+          from pathlib import Path
+
+          index = Path("build/web/index.html")
+          text = index.read_text()
+
+          text = text.replace("co-op-connection.tar.gz", "co-op-connection-debugtest.tar.gz")
+          text = text.replace('"archive":"co-op-connection"', '"archive":"co-op-connection-debugtest"')
+          text = text.replace('"archive": "co-op-connection"', '"archive": "co-op-connection-debugtest"')
+          text = text.replace("archive: 'co-op-connection'", "archive: 'co-op-connection-debugtest'")
+          text = text.replace('archive: "co-op-connection"', 'archive: "co-op-connection-debugtest"')
+
+          index.write_text(text)
+          PY
 
       - name: Show build output after build
         run: |
           echo "=== BUILD FILES ==="
-          find build -type f | sort
-
-      - name: Show archive contents
-        run: |
-          echo "=== ARCHIVE CONTENTS ==="
-          tar -tzf build/web/co-op-connection.tar.gz | sort
+          find build/web -type f | sort
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
