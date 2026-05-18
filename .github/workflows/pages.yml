@@ -31,16 +31,19 @@ jobs:
         run: python -m pygbag --build --html --width 900 --height 1350 --ume_block 0 --CONSOLE 0 .
 
       - name: Show build output
-        run: find build -maxdepth 4 -type f | sort
+        run: find build -type f | sort
 
-      - name: Ensure expected archive filename exists
+      - name: Fix archive name
         run: |
-          ARCHIVE_FILE=$(find build/web -name "*.tar.gz" | head -n 1)
+          ARCHIVE_FILE=$(find build/web -type f \( -name "*.tar.gz" -o -name "*.apk" -o -name "*.zip" \) | head -n 1)
           echo "Found archive: $ARCHIVE_FILE"
+
           if [ -z "$ARCHIVE_FILE" ]; then
-            echo "No .tar.gz archive found in build/web"
+            echo "No archive file found in build/web"
+            find build/web -type f | sort
             exit 1
           fi
+
           cp "$ARCHIVE_FILE" build/web/co-op-connection.tar.gz
 
       - name: Upload artifact
