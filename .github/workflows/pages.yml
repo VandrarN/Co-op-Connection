@@ -27,24 +27,11 @@ jobs:
       - name: Install pygbag
         run: pip install pygbag
 
-      - name: Build game
-        run: python -m pygbag --build --html --width 900 --height 1350 --ume_block 0 --CONSOLE 0 .
+      - name: Build portrait web game
+        run: python -m pygbag --build --width 900 --height 1350 .
 
       - name: Show build output
         run: find build -type f | sort
-
-      - name: Fix archive name
-        run: |
-          ARCHIVE_FILE=$(find build/web -type f \( -name "*.tar.gz" -o -name "*.apk" -o -name "*.zip" \) | head -n 1)
-          echo "Found archive: $ARCHIVE_FILE"
-
-          if [ -z "$ARCHIVE_FILE" ]; then
-            echo "No archive file found in build/web"
-            find build/web -type f | sort
-            exit 1
-          fi
-
-          cp "$ARCHIVE_FILE" build/web/co-op-connection.tar.gz
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
