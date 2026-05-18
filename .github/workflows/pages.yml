@@ -30,29 +30,40 @@ jobs:
       - name: Build portrait web game
         run: python -m pygbag --build --width 900 --height 1350 .
 
-      - name: Force fresh archive name
+      - name: Force debug archive in generated page
         run: |
-          cp build/web/co-op-connection.tar.gz build/web/co-op-connection-debugtest.tar.gz
+          cp build/web/co-op-connection.tar.gz build/web/debug-main-test.tar.gz
+
+          echo "=== BEFORE ==="
+          grep -n "co-op-connection" build/web/index.html || true
 
           python - <<'PY'
           from pathlib import Path
 
-          index = Path("build/web/index.html")
-          text = index.read_text()
+          p = Path("build/web/index.html")
+          text = p.read_text()
 
-          text = text.replace("co-op-connection.tar.gz", "co-op-connection-debugtest.tar.gz")
-          text = text.replace('"archive":"co-op-connection"', '"archive":"co-op-connection-debugtest"')
-          text = text.replace('"archive": "co-op-connection"', '"archive": "co-op-connection-debugtest"')
-          text = text.replace("archive: 'co-op-connection'", "archive: 'co-op-connection-debugtest'")
-          text = text.replace('archive: "co-op-connection"', 'archive: "co-op-connection-debugtest"')
+          text = text.replace("co-op-connection.tar.gz", "debug-main-test.tar.gz")
+          text = text.replace('archive":"co-op-connection"', 'archive":"debug-main-test"')
+          text = text.replace('archive": "co-op-connection"', 'archive": "debug-main-test"')
+          text = text.replace("archive='co-op-connection'", "archive='debug-main-test'")
+          text = text.replace('archive="co-op-connection"', 'archive="debug-main-test"')
+          text = text.replace("archive: 'co-op-connection'", "archive: 'debug-main-test'")
+          text = text.replace('archive: "co-op-connection"', 'archive: "debug-main-test"')
 
-          index.write_text(text)
+          p.write_text(text)
           PY
 
-      - name: Show build output after build
-        run: |
-          echo "=== BUILD FILES ==="
-          find build/web -type f | sort
+          echo "=== AFTER ==="
+          grep -n "debug-main-test" build/web/index.html
+
+          if grep -q "co-op-connection.tar.gz" build/web/index.html; then
+            echo "ERROR: index.html still points to old archive"
+            exit 1
+          fi
+
+      - name: Show build output
+        run: find build/web -type f | sort
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
