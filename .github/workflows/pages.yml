@@ -28,16 +28,14 @@ jobs:
         run: pip install pygbag
 
       - name: Build portrait web game
-        run: python -m pygbag --build --width 900 --height 1350 .
+        run: python -m pygbag --build --width 900 --height 1350 --ume_block 0 --template noctx.tmpl .
 
       - name: Verify debug text exists in build
         run: |
           echo "=== SEARCHING GENERATED FILES ==="
-
           find . -name "*.py" | sort
 
           echo "=== SEARCH FOR DEBUG TEXT ==="
-
           grep -R "MAIN.PY IS RUNNING" . || true
 
       - name: Upload artifact
