@@ -7,12 +7,13 @@ import os
 import io
 import base64
 import random
+import json
 
 pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 5B Wildcard Choice Test")
+pygame.display.set_caption("Co-op Connection Phase 6C Real Content Loading Test")
 
 ui_font = pygame.font.SysFont(None, 31)
 small_font = pygame.font.SysFont(None, 26)
@@ -99,6 +100,18 @@ BACKGROUND_DECK_HIT_RECTS = {
 }
 BASE_UNLOCKED_DECKS = ["CASUAL", "SOUL", "FUN", "ASSUMPTION", "COLD", "FREE"]
 
+CONTENT_DECKS = {}
+CONTENT_STATUS = "Content not loaded yet"
+CONTENT_ERRORS = []
+CATEGORY_TO_FILES = {
+    "CASUAL": ["content/casual.json"],
+    "SOUL": ["content/soul.json"],
+    "FUN": ["content/fun.json"],
+    "ASSUMPTION": ["content/fun.json"],
+    "COLD": ["content/cold.json"],
+    "FREE": ["content/fun.json"],
+}
+
 
 def resource_path(relative):
     candidates = [
@@ -114,6 +127,119 @@ def resource_path(relative):
         except Exception:
             pass
     return relative
+
+
+
+def read_json_file(path):
+    try:
+        actual = resource_path(path)
+        with open(actual, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        CONTENT_ERRORS.append(f"{path}: {e}")
+        return None
+
+
+def extract_card_texts(data):
+    """Flexible extractor for the V10 JSON deck shapes."""
+    texts = []
+
+    def add_value(value):
+        if isinstance(value, str):
+            value = value.strip()
+            if value:
+                texts.append(value)
+        elif isinstance(value, dict):
+            # Prefer common prompt/question fields first.
+            for key in ["text", "prompt", "question", "card", "body", "title"]:
+                v = value.get(key)
+                if isinstance(v, str) and v.strip():
+                    texts.append(v.strip())
+                    return
+            # If no known field exists, scan nested values.
+            for v in value.values():
+                add_value(v)
+        elif isinstance(value, list):
+            for item in value:
+                add_value(item)
+
+    if isinstance(data, dict):
+        # Prefer common deck arrays if present.
+        for key in ["cards", "questions", "prompts", "items", "deck"]:
+            if key in data:
+                add_value(data[key])
+                break
+        else:
+            add_value(data)
+    else:
+        add_value(data)
+
+    # De-duplicate while preserving order.
+    seen = set()
+    out = []
+    for t in texts:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def load_content_decks():
+    global CONTENT_STATUS
+    CONTENT_DECKS.clear()
+    CONTENT_ERRORS.clear()
+
+    for category, files in CATEGORY_TO_FILES.items():
+        cards = []
+        for file in files:
+            data = read_json_file(file)
+            if data is not None:
+                cards.extend(extract_card_texts(data))
+        CONTENT_DECKS[category] = cards
+
+    loaded = sum(1 for cards in CONTENT_DECKS.values() if cards)
+    total_cards = sum(len(cards) for cards in CONTENT_DECKS.values())
+
+    if loaded:
+        CONTENT_STATUS = f"Content loaded: {total_cards} cards across {loaded} decks"
+    else:
+        if CONTENT_ERRORS:
+            CONTENT_STATUS = "Content load failed"
+        else:
+            CONTENT_STATUS = "No content cards found"
+
+
+def draw_real_card_text(category):
+    cards = CONTENT_DECKS.get(category, [])
+    if cards:
+        return random.choice(cards)
+
+    # Safe fallback keeps the game running if one category is missing.
+    if CONTENT_ERRORS:
+        return f"{category} content missing. First error: {CONTENT_ERRORS[0]}"
+    return f"{category} content missing"
+
+
+def wrap_text_lines(text, font, max_width, max_lines=5):
+    words = str(text).replace("\\n", " ").split()
+    lines = []
+    current = ""
+
+    for word in words:
+        test = (current + " " + word).strip()
+        if font.size(test)[0] <= max_width:
+            current = test
+        else:
+            if current:
+                lines.append(current)
+            current = word
+        if len(lines) >= max_lines:
+            break
+
+    if current and len(lines) < max_lines:
+        lines.append(current)
+
+    return lines
 
 
 def load_image(filename, alpha=False):
@@ -340,7 +466,7 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 5B: wildcard choice restored", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 6C: real content loading", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
 
 
@@ -527,8 +653,11 @@ def draw_table_screen():
     for rect in GAME_BUTTONS.values():
         draw_button_hover(rect)
 
-    msg = pygame.font.SysFont(None, 24).render("Phase 5B: Cloud shows Choose a Card; click deck to draw", True, (60, 35, 20))
+    msg = pygame.font.SysFont(None, 24).render("Phase 6C: real content loading test + wildcard", True, (60, 35, 20))
     screen.blit(msg, (14, 1314))
+
+    status = pygame.font.SysFont(None, 22).render(CONTENT_STATUS, True, (60, 35, 20))
+    screen.blit(status, (14, 1288))
 
 
 
@@ -571,7 +700,7 @@ def start_card_shell(chosen_category=None):
     card_category = chosen_category or current_dice_face
     if card_category == "WILDCARD":
         card_category = "FREE"
-    card_text = f"{card_category} card shell"
+    card_text = draw_real_card_text(card_category)
     card_anim_t = 0.0
     card_state = "fly"
     free_choice = False
@@ -622,11 +751,16 @@ def draw_card_shell():
     title = ui_font.render(card_category, True, (85, 60, 45))
     surf.blit(title, title.get_rect(center=(w // 2, 86)))
 
-    body = pygame.font.SysFont(None, 30).render(card_text, True, (55, 40, 30))
-    surf.blit(body, body.get_rect(center=(w // 2, 145)))
+    body_font = pygame.font.SysFont(None, 27)
+    y_cursor = 118
+    for line in wrap_text_lines(card_text, body_font, w - 54, max_lines=4):
+        body = body_font.render(line, True, (55, 40, 30))
+        surf.blit(body, body.get_rect(center=(w // 2, y_cursor)))
+        y_cursor += body.get_height() + 5
 
-    hint = pygame.font.SysFont(None, 24).render("Placeholder card - content not restored yet", True, (95, 70, 50))
-    surf.blit(hint, hint.get_rect(center=(w // 2, 190)))
+    hint_text = "Real content" if CONTENT_DECKS.get(card_category) else "Content fallback"
+    hint = pygame.font.SysFont(None, 22).render(hint_text, True, (95, 70, 50))
+    surf.blit(hint, hint.get_rect(center=(w // 2, 214)))
 
     if (sw, sh) != (w, h):
         surf = pygame.transform.smoothscale(surf, (sw, sh))
@@ -635,6 +769,7 @@ def draw_card_shell():
 
 
 load_assets()
+load_content_decks()
 
 
 async def main():
