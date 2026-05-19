@@ -8,16 +8,11 @@ import io
 import base64
 import random
 
-try:
-    from content_manager import ContentManager
-except Exception:
-    ContentManager = None
-
 pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 6B Wildcard Choice Test")
+pygame.display.set_caption("Co-op Connection Phase 5B Wildcard Choice Test")
 
 ui_font = pygame.font.SysFont(None, 31)
 small_font = pygame.font.SysFont(None, 26)
@@ -79,21 +74,6 @@ card_category = "CASUAL"
 card_text = "Card shell test"
 card_anim_t = 0.0
 card_state = "hidden"
-content = None
-content_loaded = False
-content_error = ""
-completed_cards = 0
-category_counts = {
-    "CASUAL": 0,
-    "SOUL": 0,
-    "FUN": 0,
-    "ASSUMPTION": 0,
-    "COLD": 0,
-    "FREE": 0,
-}
-mirror_coins = [3, 3]
-mirror_flash_t = 0.0
-last_action_message = ""
 free_choice = False
 
 DICE_ICON_FILES = {
@@ -360,7 +340,7 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 6B: wildcard choice restored", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 5B: wildcard choice restored", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
 
 
@@ -530,22 +510,6 @@ def hit_wildcard_deck(pos):
     return None
 
 
-def use_mirror_coin():
-    global mirror_flash_t, card_text
-    cur = players.active
-    if mirror_coins[cur] <= 0:
-        set_action_message("No Mirror Coins left")
-        return
-    if not card_visible:
-        set_action_message("Draw a card first")
-        return
-    mirror_coins[cur] -= 1
-    mirror_flash_t = 0.8
-    card_text = get_real_card_text(card_category)
-    players.swap_turn()
-    set_action_message("Mirror used")
-
-
 def draw_table_screen():
     if table_bg_1:
         screen.blit(table_bg_1, (0, 0))
@@ -555,12 +519,6 @@ def draw_table_screen():
         screen.blit(msg, msg.get_rect(center=(W // 2, 240)))
 
     players.draw()
-
-    coin_font = pygame.font.SysFont(None, 24, bold=True)
-    coin1 = coin_font.render(f"Mirror P1: {mirror_coins[0]}", True, (70, 45, 25))
-    coin2 = coin_font.render(f"Mirror P2: {mirror_coins[1]}", True, (70, 45, 25))
-    screen.blit(coin1, (42, 748))
-    screen.blit(coin2, (42, 776))
     draw_dice((W // 2, H // 2 + 190))
     draw_card_shell()
     draw_choose_card_prompt()
@@ -569,7 +527,7 @@ def draw_table_screen():
     for rect in GAME_BUTTONS.values():
         draw_button_hover(rect)
 
-    msg = pygame.font.SysFont(None, 24).render("Phase 6B: Cloud shows Choose a Card; click deck to draw", True, (60, 35, 20))
+    msg = pygame.font.SysFont(None, 24).render("Phase 5B: Cloud shows Choose a Card; click deck to draw", True, (60, 35, 20))
     screen.blit(msg, (14, 1314))
 
 
@@ -584,21 +542,6 @@ def start_dice_roll():
     current_dice_face = random.choice(DICE_FACES)
     card_visible = False
     card_state = "hidden"
-content = None
-content_loaded = False
-content_error = ""
-completed_cards = 0
-category_counts = {
-    "CASUAL": 0,
-    "SOUL": 0,
-    "FUN": 0,
-    "ASSUMPTION": 0,
-    "COLD": 0,
-    "FREE": 0,
-}
-mirror_coins = [3, 3]
-mirror_flash_t = 0.0
-last_action_message = ""
     free_choice = False
 
 
@@ -634,20 +577,6 @@ def start_card_shell(chosen_category=None):
     free_choice = False
 
 
-def start_card_from_category(category):
-    global card_visible, card_category, card_text, card_anim_t, card_state, current_dice_face
-    if dice_rolling:
-        set_action_message("Wait for the dice to stop.")
-        return
-    card_visible = True
-    card_category = category
-    current_dice_face = category
-    card_text = get_real_card_text(category)
-    card_anim_t = 0.0
-    card_state = "fly"
-    set_action_message(f"Chose {category}")
-
-
 def update_card(dt):
     global card_anim_t, card_state
     if not card_visible:
@@ -663,21 +592,6 @@ def clear_card_and_next_turn():
     global card_visible, card_state, free_choice
     card_visible = False
     card_state = "hidden"
-content = None
-content_loaded = False
-content_error = ""
-completed_cards = 0
-category_counts = {
-    "CASUAL": 0,
-    "SOUL": 0,
-    "FUN": 0,
-    "ASSUMPTION": 0,
-    "COLD": 0,
-    "FREE": 0,
-}
-mirror_coins = [3, 3]
-mirror_flash_t = 0.0
-last_action_message = ""
     free_choice = False
     players.swap_turn()
 
@@ -708,22 +622,11 @@ def draw_card_shell():
     title = ui_font.render(card_category, True, (85, 60, 45))
     surf.blit(title, title.get_rect(center=(w // 2, 86)))
 
-    body_font = pygame.font.SysFont(None, 27)
-    y_cursor = 116
-    for line in wrap_lines(card_text, body_font, w - 54)[:5]:
-        body = body_font.render(line, True, (55, 40, 30))
-        surf.blit(body, body.get_rect(center=(w // 2, y_cursor)))
-        y_cursor += body.get_height() + 4
+    body = pygame.font.SysFont(None, 30).render(card_text, True, (55, 40, 30))
+    surf.blit(body, body.get_rect(center=(w // 2, 145)))
 
-    hint_text = "Real content" if content_loaded else "Content fallback"
-    hint = pygame.font.SysFont(None, 22).render(hint_text, True, (95, 70, 50))
-    surf.blit(hint, hint.get_rect(center=(w // 2, 216)))
-
-    if mirror_flash_t > 0:
-        flash = pygame.Surface((w, h), pygame.SRCALPHA)
-        alpha = int(120 * min(1.0, mirror_flash_t / 0.8))
-        pygame.draw.rect(flash, (255, 245, 210, alpha), flash.get_rect(), border_radius=20)
-        surf.blit(flash, (0, 0))
+    hint = pygame.font.SysFont(None, 24).render("Placeholder card - content not restored yet", True, (95, 70, 50))
+    surf.blit(hint, hint.get_rect(center=(w // 2, 190)))
 
     if (sw, sh) != (w, h):
         surf = pygame.transform.smoothscale(surf, (sw, sh))
@@ -731,65 +634,7 @@ def draw_card_shell():
     screen.blit(surf, surf.get_rect(center=(x, y)).topleft)
 
 
-
-def init_content():
-    global content, content_loaded, content_error
-    if ContentManager is None:
-        content = None
-        content_loaded = False
-        content_error = "ContentManager import failed"
-        return
-
-    try:
-        content = ContentManager("content")
-        content.load_all()
-        try:
-            content.set_online_fun_enabled(playing_online_enabled)
-        except Exception:
-            pass
-        content_loaded = True
-        content_error = ""
-    except Exception as e:
-        content = None
-        content_loaded = False
-        content_error = str(e)
-
-
-def get_real_card_text(category):
-    if not content_loaded or content is None:
-        if content_error:
-            return f"Content not loaded: {content_error}"
-        return f"{category} card placeholder"
-
-    try:
-        return content.get_question(category)
-    except Exception as e:
-        return f"Could not draw {category} card: {e}"
-
-
-def wrap_lines(text, font, max_width):
-    words = str(text).split(" ")
-    lines = []
-    current = ""
-    for w in words:
-        test = (current + " " + w).strip()
-        if font.size(test)[0] <= max_width:
-            current = test
-        else:
-            if current:
-                lines.append(current)
-            current = w
-    if current:
-        lines.append(current)
-    return lines
-
-
-def set_action_message(text):
-    global last_action_message
-    last_action_message = text or ""
-
 load_assets()
-init_content()
 
 
 async def main():
@@ -851,11 +696,6 @@ async def main():
 
                     if title_coin_rects.get("online_toggle") and title_coin_rects["online_toggle"].collidepoint(click_pos):
                         playing_online_enabled = not playing_online_enabled
-                        if content is not None:
-                            try:
-                                content.set_online_fun_enabled(playing_online_enabled)
-                            except Exception:
-                                pass
 
                     if title_coin_rects.get("enter") and title_coin_rects["enter"].collidepoint(click_pos):
                         players.set_names(name_a.strip() or "Player 1", name_b.strip() or "Player 2")
@@ -874,8 +714,6 @@ async def main():
                                 start_dice_roll()
                             if key == "DRAW":
                                 start_card_shell()
-                            if key == "MIRROR":
-                                use_mirror_coin()
                             if key == "NEXT":
                                 clear_card_and_next_turn()
                                 active_player = players.active
@@ -889,8 +727,6 @@ async def main():
             players.update(dt)
             update_dice(dt)
             update_card(dt)
-            global mirror_flash_t
-            mirror_flash_t = max(0.0, mirror_flash_t - dt)
 
         if state == "title":
             draw_title()
