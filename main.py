@@ -12,7 +12,7 @@ pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 5 Dice + Card Shell Test")
+pygame.display.set_caption("Co-op Connection Phase 5B Wildcard Choice Test")
 
 ui_font = pygame.font.SysFont(None, 31)
 small_font = pygame.font.SysFont(None, 26)
@@ -74,6 +74,7 @@ card_category = "CASUAL"
 card_text = "Card shell test"
 card_anim_t = 0.0
 card_state = "hidden"
+free_choice = False
 
 DICE_ICON_FILES = {
     "CASUAL": "Leaf.png",
@@ -86,6 +87,17 @@ DICE_ICON_FILES = {
     "FREE": "dice_icon_free.png",
     "WILDCARD": "Cloud.png",
 }
+
+
+BACKGROUND_DECK_HIT_RECTS = {
+    "CASUAL": pygame.Rect(104, 168, 182, 164),
+    "SOUL": pygame.Rect(286, 168, 182, 164),
+    "FUN": pygame.Rect(468, 168, 182, 164),
+    "ASSUMPTION": pygame.Rect(104, 410, 182, 164),
+    "COLD": pygame.Rect(286, 410, 182, 164),
+    "FREE": pygame.Rect(468, 410, 182, 164),
+}
+BASE_UNLOCKED_DECKS = ["CASUAL", "SOUL", "FUN", "ASSUMPTION", "COLD", "FREE"]
 
 
 def resource_path(relative):
@@ -328,7 +340,7 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 5: dice actor + card shell", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 5B: wildcard choice restored", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
 
 
@@ -462,6 +474,42 @@ class PlayerPanel:
 players = PlayerPanel()
 
 
+def draw_choose_card_prompt():
+    if not free_choice:
+        return
+    prompt_font = pygame.font.SysFont("georgia", 34, bold=True)
+    text = "Choose a Card"
+    layer_w, layer_h = 380, 72
+    layer = pygame.Surface((layer_w, layer_h), pygame.SRCALPHA)
+    center = (layer_w // 2, layer_h // 2)
+    shadow = prompt_font.render(text, True, (18, 10, 5))
+    main = prompt_font.render(text, True, (55, 31, 14))
+    rect = main.get_rect(center=center)
+    layer.blit(shadow, rect.move(2, 3))
+    layer.blit(main, rect)
+    screen.blit(layer, layer.get_rect(center=(W // 2, 1082)).topleft)
+
+
+def draw_wildcard_deck_hover():
+    if not free_choice:
+        return
+    mx, my = pygame.mouse.get_pos()
+    for key in BASE_UNLOCKED_DECKS:
+        rect = BACKGROUND_DECK_HIT_RECTS[key]
+        if rect.collidepoint((mx, my)):
+            s = pygame.Surface(rect.size, pygame.SRCALPHA)
+            pygame.draw.rect(s, (255, 220, 150, 85), s.get_rect(), width=3, border_radius=18)
+            screen.blit(s, rect.topleft)
+            return
+
+
+def hit_wildcard_deck(pos):
+    for key in BASE_UNLOCKED_DECKS:
+        if BACKGROUND_DECK_HIT_RECTS[key].collidepoint(pos):
+            return key
+    return None
+
+
 def draw_table_screen():
     if table_bg_1:
         screen.blit(table_bg_1, (0, 0))
@@ -473,17 +521,19 @@ def draw_table_screen():
     players.draw()
     draw_dice((W // 2, H // 2 + 190))
     draw_card_shell()
+    draw_choose_card_prompt()
+    draw_wildcard_deck_hover()
 
     for rect in GAME_BUTTONS.values():
         draw_button_hover(rect)
 
-    msg = pygame.font.SysFont(None, 24).render("Phase 5: Roll, Draw placeholder card, Next changes player", True, (60, 35, 20))
+    msg = pygame.font.SysFont(None, 24).render("Phase 5B: Cloud shows Choose a Card; click deck to draw", True, (60, 35, 20))
     screen.blit(msg, (14, 1314))
 
 
 
 def start_dice_roll():
-    global dice_rolling, dice_roll_timer, current_dice_face, dice_final_face, card_visible, card_state
+    global dice_rolling, dice_roll_timer, current_dice_face, dice_final_face, card_visible, card_state, free_choice
     if dice_rolling:
         return
     dice_rolling = True
@@ -492,10 +542,11 @@ def start_dice_roll():
     current_dice_face = random.choice(DICE_FACES)
     card_visible = False
     card_state = "hidden"
+    free_choice = False
 
 
 def update_dice(dt):
-    global dice_rolling, dice_roll_timer, current_dice_face
+    global dice_rolling, dice_roll_timer, current_dice_face, free_choice
     if not dice_rolling:
         return
     dice_roll_timer += dt
@@ -507,17 +558,23 @@ def update_dice(dt):
     else:
         current_dice_face = dice_final_face
         dice_rolling = False
+        free_choice = (current_dice_face == "WILDCARD")
 
 
-def start_card_shell():
-    global card_visible, card_category, card_text, card_anim_t, card_state
+def start_card_shell(chosen_category=None):
+    global card_visible, card_category, card_text, card_anim_t, card_state, free_choice
     if dice_rolling:
         return
+    if free_choice and chosen_category is None:
+        return
     card_visible = True
-    card_category = current_dice_face if current_dice_face != "WILDCARD" else "FREE"
+    card_category = chosen_category or current_dice_face
+    if card_category == "WILDCARD":
+        card_category = "FREE"
     card_text = f"{card_category} card shell"
     card_anim_t = 0.0
     card_state = "fly"
+    free_choice = False
 
 
 def update_card(dt):
@@ -532,9 +589,10 @@ def update_card(dt):
 
 
 def clear_card_and_next_turn():
-    global card_visible, card_state
+    global card_visible, card_state, free_choice
     card_visible = False
     card_state = "hidden"
+    free_choice = False
     players.swap_turn()
 
 
@@ -648,8 +706,10 @@ async def main():
                         sys.exit()
 
                 elif state == "game":
+                    clicked_button = False
                     for key, rect in GAME_BUTTONS.items():
                         if rect.collidepoint(click_pos):
+                            clicked_button = True
                             if key == "ROLL":
                                 start_dice_roll()
                             if key == "DRAW":
@@ -657,6 +717,11 @@ async def main():
                             if key == "NEXT":
                                 clear_card_and_next_turn()
                                 active_player = players.active
+
+                    if (not clicked_button) and free_choice:
+                        chosen = hit_wildcard_deck(click_pos)
+                        if chosen:
+                            start_card_shell(chosen)
 
         if state == "game":
             players.update(dt)
