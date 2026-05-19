@@ -4,12 +4,14 @@ import pygame
 import asyncio
 import sys
 import os
+import io
+import base64
 
 pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 3 Table Visual Test")
+pygame.display.set_caption("Co-op Connection Phase 3B Table Visual Test")
 
 ui_font = pygame.font.SysFont(None, 31)
 small_font = pygame.font.SysFont(None, 26)
@@ -55,6 +57,7 @@ GAME_BUTTONS = {
 
 _MIRROR_MINUS_IMG = None
 _MIRROR_PLUS_IMG = None
+_PLAYER_PANEL_IMG = None
 start_bg = None
 table_bg_1 = None
 
@@ -109,13 +112,14 @@ def cover_scale(img):
 
 
 def load_assets():
-    global start_bg, table_bg_1
+    global start_bg, table_bg_1, _PLAYER_PANEL_IMG
     start = load_image("StartScreen_BG.png", alpha=False)
     if start:
         start_bg = cover_scale(start)
     table = load_image("GameTable_BG_1.png", alpha=False)
     if table:
         table_bg_1 = cover_scale(table)
+    _PLAYER_PANEL_IMG = load_image("PlayerNamePanel.png", alpha=True) or False
 
 
 def get_title_name_boxes():
@@ -247,7 +251,7 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 3: title + GameTable_BG_1", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 3B: table + player panel", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
 
 
@@ -263,14 +267,102 @@ def draw_placeholder_dice(center):
         pygame.draw.circle(screen, dot_color, (x + dx, y + dy), 7)
 
 
-def draw_game_button_overlay(label, rect):
+def draw_button_hover(rect):
     mx, my = pygame.mouse.get_pos()
     if rect.collidepoint((mx, my)):
         s = pygame.Surface(rect.size, pygame.SRCALPHA)
         pygame.draw.rect(s, (255, 220, 150, 85), s.get_rect(), width=3, border_radius=16)
         screen.blit(s, rect.topleft)
-    txt = small_font.render(label, True, (70, 45, 25))
-    screen.blit(txt, txt.get_rect(center=rect.center))
+
+
+class PlayerPanel:
+    def __init__(self):
+        self.names = ["Player 1", "Player 2"]
+        self.active = 0
+        self.glow_t = 1.0
+        self.pos = (-52, 585)
+        self.target_w = int(298 * 1.2)
+        self._scaled = None
+        self._scaled_size = None
+
+    def set_names(self, a, b):
+        self.names = [a or "Player 1", b or "Player 2"]
+
+    def swap_turn(self):
+        self.active = 1 - self.active
+        self.glow_t = 0.0
+
+    def update(self, dt):
+        self.glow_t = min(1.0, self.glow_t + dt * 2.5)
+
+    def _scaled_panel(self):
+        global _PLAYER_PANEL_IMG
+        if not _PLAYER_PANEL_IMG:
+            return None
+        iw, ih = _PLAYER_PANEL_IMG.get_size()
+        if iw <= 0 or ih <= 0:
+            return None
+        target_w = self.target_w
+        target_h = max(1, int(ih * (target_w / iw)))
+        if self._scaled is None or self._scaled_size != (target_w, target_h):
+            self._scaled = pygame.transform.smoothscale(_PLAYER_PANEL_IMG, (target_w, target_h))
+            self._scaled_size = (target_w, target_h)
+        return self._scaled
+
+    def draw(self):
+        panel = self._scaled_panel()
+        x, y = self.pos
+
+        if panel is None:
+            panel_w, row_h = 258, 42
+            gap = 10
+            outer_h = row_h * 2 + gap + 18
+            outer = pygame.Rect(x, y, panel_w, outer_h)
+            box = pygame.Surface(outer.size, pygame.SRCALPHA)
+            pygame.draw.rect(box, (88, 56, 36, 235), box.get_rect(), border_radius=16)
+            pygame.draw.rect(box, (140, 98, 68, 230), box.get_rect(), width=3, border_radius=16)
+            screen.blit(box, outer.topleft)
+            row_rects = [
+                pygame.Rect(x + 12, y + 10, panel_w - 24, row_h),
+                pygame.Rect(x + 12, y + 10 + row_h + gap, panel_w - 24, row_h),
+            ]
+        else:
+            screen.blit(panel, (x, y))
+            pw, ph = panel.get_size()
+            row_rects = [
+                pygame.Rect(x + int(pw * 0.296), y + int(ph * 0.333), int(pw * 0.438), int(ph * 0.122)),
+                pygame.Rect(x + int(pw * 0.296), y + int(ph * 0.539), int(pw * 0.438), int(ph * 0.122)),
+            ]
+
+        for i, rect in enumerate(row_rects):
+            if i == self.active:
+                base_a = 52
+                pulse_a = int(42 * (1.0 - self.glow_t))
+                a = max(0, min(120, base_a + pulse_a))
+                glow = pygame.Surface(rect.size, pygame.SRCALPHA)
+                pygame.draw.rect(glow, (255, 210, 150, a), glow.get_rect(), border_radius=12)
+                pygame.draw.rect(glow, (255, 244, 210, min(120, a + 16)), glow.get_rect(), width=2, border_radius=12)
+                screen.blit(glow, rect.topleft)
+
+            name = self.names[i]
+            draw_font = ui_font
+            txt_main = draw_font.render(name, True, (90, 55, 32))
+            txt_shadow = draw_font.render(name, True, (240, 223, 192))
+
+            available_w = rect.w - 16
+            if txt_main.get_width() > available_w and len(name) > 1:
+                shrink = max(9, int(draw_font.get_height() * available_w / max(1, txt_main.get_width())))
+                draw_font = pygame.font.SysFont(None, shrink)
+                txt_main = draw_font.render(name, True, (90, 55, 32))
+                txt_shadow = draw_font.render(name, True, (240, 223, 192))
+
+            tx = rect.x + 10
+            ty = rect.y + (rect.h - txt_main.get_height()) // 2
+            screen.blit(txt_shadow, (tx + 1, ty + 1))
+            screen.blit(txt_main, (tx, ty))
+
+
+players = PlayerPanel()
 
 
 def draw_table_screen():
@@ -281,19 +373,13 @@ def draw_table_screen():
         msg = placeholder_font.render("TABLE BG 1 NOT LOADED", True, (255, 245, 210))
         screen.blit(msg, msg.get_rect(center=(W // 2, 240)))
 
-    player1 = name_a.strip() or "Player 1"
-    player2 = name_b.strip() or "Player 2"
-    p1 = ui_font.render(player1, True, (85, 55, 35))
-    p2 = ui_font.render(player2, True, (85, 55, 35))
-    screen.blit(p1, (50, 600))
-    screen.blit(p2, (50, 670))
-
+    players.draw()
     draw_placeholder_dice((W // 2, H // 2 + 190))
 
-    for key, rect in GAME_BUTTONS.items():
-        draw_game_button_overlay(key.title(), rect)
+    for rect in GAME_BUTTONS.values():
+        draw_button_hover(rect)
 
-    msg = pygame.font.SysFont(None, 24).render("Phase 3 table visual test: no cards/content logic yet", True, (60, 35, 20))
+    msg = pygame.font.SysFont(None, 24).render("Phase 3B table visual test: no cards/content logic yet", True, (60, 35, 20))
     screen.blit(msg, (14, 1314))
 
 
@@ -303,7 +389,11 @@ load_assets()
 async def main():
     global name_a, name_b, active_field, title_mirror_coins, playing_online_enabled, state, active_player
 
+    clock = pygame.time.Clock()
+
     while True:
+        dt = clock.tick(60) / 1000.0
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -319,6 +409,7 @@ async def main():
 
                 if state == "title":
                     if event.key == pygame.K_RETURN:
+                        players.set_names(name_a.strip() or "Player 1", name_b.strip() or "Player 2")
                         state = "game"
                     elif event.key == pygame.K_TAB:
                         active_field = 1 - active_field
@@ -356,6 +447,7 @@ async def main():
                         playing_online_enabled = not playing_online_enabled
 
                     if title_coin_rects.get("enter") and title_coin_rects["enter"].collidepoint(click_pos):
+                        players.set_names(name_a.strip() or "Player 1", name_b.strip() or "Player 2")
                         state = "game"
 
                     if title_coin_rects.get("quit") and title_coin_rects["quit"].collidepoint(click_pos):
@@ -366,7 +458,11 @@ async def main():
                     for key, rect in GAME_BUTTONS.items():
                         if rect.collidepoint(click_pos):
                             if key == "NEXT":
-                                active_player = 1 - active_player
+                                players.swap_turn()
+                                active_player = players.active
+
+        if state == "game":
+            players.update(dt)
 
         if state == "title":
             draw_title()
