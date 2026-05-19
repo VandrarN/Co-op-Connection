@@ -9,9 +9,10 @@ pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 2B Title UI Test")
+pygame.display.set_caption("Co-op Connection Phase 3 Table Visual Test")
 
 ui_font = pygame.font.SysFont(None, 31)
+small_font = pygame.font.SysFont(None, 26)
 placeholder_font = pygame.font.SysFont(None, 58, bold=True)
 
 name_a = ""
@@ -23,6 +24,7 @@ TITLE_MIRROR_MAX = 5
 playing_online_enabled = False
 title_coin_rects = {}
 state = "title"
+active_player = 0
 
 TITLE_NAME_BOX_W = 526
 TITLE_NAME_BOX_H = 54
@@ -37,9 +39,24 @@ ONLINE_TOGGLE_X_RECT = pygame.Rect(226, 907, 30, 30)
 ENTER_RECT = pygame.Rect(153, 1000, 286, 68)
 QUIT_RECT = pygame.Rect(462, 1000, 282, 72)
 
+BTN_W = 160
+BTN_H = 70
+BTN_GAP = 14
+BTN_Y = 1216
+_btn_row_x0 = 21
+
+GAME_BUTTONS = {
+    "ROLL": pygame.Rect(_btn_row_x0 + 0 * (BTN_W + BTN_GAP), BTN_Y, BTN_W, BTN_H),
+    "DRAW": pygame.Rect(_btn_row_x0 + 1 * (BTN_W + BTN_GAP), BTN_Y, BTN_W, BTN_H),
+    "NEXT": pygame.Rect(_btn_row_x0 + 2 * (BTN_W + BTN_GAP), BTN_Y, BTN_W, BTN_H),
+    "SKIP": pygame.Rect(_btn_row_x0 + 3 * (BTN_W + BTN_GAP), BTN_Y, BTN_W, BTN_H),
+    "MIRROR": pygame.Rect(_btn_row_x0 + 4 * (BTN_W + BTN_GAP), BTN_Y, BTN_W, BTN_H),
+}
+
 _MIRROR_MINUS_IMG = None
 _MIRROR_PLUS_IMG = None
-bg = None
+start_bg = None
+table_bg_1 = None
 
 
 def resource_path(relative):
@@ -74,11 +91,31 @@ def load_image(filename, alpha=False):
         return None
 
 
-def load_background():
-    global bg
-    img = load_image("StartScreen_BG.png", alpha=False)
-    if img:
-        bg = pygame.transform.smoothscale(img, (W, H))
+def cover_scale(img):
+    if not img:
+        return None
+    iw, ih = img.get_size()
+    if iw <= 0 or ih <= 0:
+        return None
+    if (iw, ih) == (W, H):
+        return img
+    scale = max(W / iw, H / ih)
+    sw = max(1, int(iw * scale))
+    sh = max(1, int(ih * scale))
+    scaled = pygame.transform.smoothscale(img, (sw, sh))
+    out = pygame.Surface((W, H)).convert()
+    out.blit(scaled, ((W - sw) // 2, (H - sh) // 2))
+    return out
+
+
+def load_assets():
+    global start_bg, table_bg_1
+    start = load_image("StartScreen_BG.png", alpha=False)
+    if start:
+        start_bg = cover_scale(start)
+    table = load_image("GameTable_BG_1.png", alpha=False)
+    if table:
+        table_bg_1 = cover_scale(table)
 
 
 def get_title_name_boxes():
@@ -102,12 +139,11 @@ def draw_x(rect):
 
 def draw_title():
     global title_coin_rects, _MIRROR_MINUS_IMG, _MIRROR_PLUS_IMG
-
-    if bg:
-        screen.blit(bg, (0, 0))
+    if start_bg:
+        screen.blit(start_bg, (0, 0))
     else:
         screen.fill((170, 35, 185))
-        msg = placeholder_font.render("BACKGROUND NOT LOADED", True, (255, 245, 120))
+        msg = placeholder_font.render("START BACKGROUND NOT LOADED", True, (255, 245, 120))
         screen.blit(msg, msg.get_rect(center=(W // 2, 240)))
 
     mx, my = pygame.mouse.get_pos()
@@ -165,7 +201,7 @@ def draw_title():
     minus_rect.size = (max(24, int(target_h * minus_aspect)), target_h)
     plus_rect.size = (max(24, int(target_h * plus_aspect)), target_h)
 
-    pair_center_x = int((minus_anchor_cx + plus_anchor_cx) / 2)
+    pair_center_x = int((plus_anchor_cx + minus_anchor_cx) / 2)
     pair_gap = 6
     total_w = minus_rect.w + pair_gap + plus_rect.w
     minus_rect.left = pair_center_x - (total_w // 2)
@@ -211,25 +247,61 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 2B title UI test", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 3: title + GameTable_BG_1", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
 
 
-def draw_placeholder_game():
-    screen.fill((40, 30, 25))
-    msg1 = placeholder_font.render("TITLE SCREEN WORKS", True, (255, 245, 210))
-    msg2 = ui_font.render("Gameplay is not restored yet.", True, (255, 245, 210))
-    msg3 = ui_font.render(f"{name_a or 'Player 1'} + {name_b or 'Player 2'}", True, (255, 245, 210))
-    screen.blit(msg1, msg1.get_rect(center=(W // 2, 430)))
-    screen.blit(msg2, msg2.get_rect(center=(W // 2, 505)))
-    screen.blit(msg3, msg3.get_rect(center=(W // 2, 570)))
+def draw_placeholder_dice(center):
+    x, y = center
+    size = 84
+    rect = pygame.Rect(0, 0, size, size)
+    rect.center = (x, y)
+    pygame.draw.rect(screen, (250, 244, 232), rect, border_radius=14)
+    pygame.draw.rect(screen, (210, 195, 170), rect.inflate(-8, -8), width=2, border_radius=12)
+    dot_color = (75, 55, 40)
+    for dx, dy in [(-20, -20), (20, 20), (0, 0)]:
+        pygame.draw.circle(screen, dot_color, (x + dx, y + dy), 7)
 
 
-load_background()
+def draw_game_button_overlay(label, rect):
+    mx, my = pygame.mouse.get_pos()
+    if rect.collidepoint((mx, my)):
+        s = pygame.Surface(rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(s, (255, 220, 150, 85), s.get_rect(), width=3, border_radius=16)
+        screen.blit(s, rect.topleft)
+    txt = small_font.render(label, True, (70, 45, 25))
+    screen.blit(txt, txt.get_rect(center=rect.center))
+
+
+def draw_table_screen():
+    if table_bg_1:
+        screen.blit(table_bg_1, (0, 0))
+    else:
+        screen.fill((60, 43, 30))
+        msg = placeholder_font.render("TABLE BG 1 NOT LOADED", True, (255, 245, 210))
+        screen.blit(msg, msg.get_rect(center=(W // 2, 240)))
+
+    player1 = name_a.strip() or "Player 1"
+    player2 = name_b.strip() or "Player 2"
+    p1 = ui_font.render(player1, True, (85, 55, 35))
+    p2 = ui_font.render(player2, True, (85, 55, 35))
+    screen.blit(p1, (50, 600))
+    screen.blit(p2, (50, 670))
+
+    draw_placeholder_dice((W // 2, H // 2 + 190))
+
+    for key, rect in GAME_BUTTONS.items():
+        draw_game_button_overlay(key.title(), rect)
+
+    msg = pygame.font.SysFont(None, 24).render("Phase 3 table visual test: no cards/content logic yet", True, (60, 35, 20))
+    screen.blit(msg, (14, 1314))
+
+
+load_assets()
 
 
 async def main():
-    global name_a, name_b, active_field, title_mirror_coins, playing_online_enabled, state
+    global name_a, name_b, active_field, title_mirror_coins, playing_online_enabled, state, active_player
 
     while True:
         for event in pygame.event.get():
@@ -239,8 +311,12 @@ async def main():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    sys.exit()
+                    if state == "game":
+                        state = "title"
+                    else:
+                        pygame.quit()
+                        sys.exit()
+
                 if state == "title":
                     if event.key == pygame.K_RETURN:
                         state = "game"
@@ -259,35 +335,43 @@ async def main():
                             elif active_field == 1 and len(name_b) < 18:
                                 name_b += ch
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and state == "title":
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 click_pos = event.pos
-                box1, box2 = get_title_name_boxes()
 
-                if box1.collidepoint(click_pos):
-                    active_field = 0
-                elif box2.collidepoint(click_pos):
-                    active_field = 1
+                if state == "title":
+                    box1, box2 = get_title_name_boxes()
 
-                if title_coin_rects.get("minus_shared") and title_coin_rects["minus_shared"].collidepoint(click_pos):
-                    title_mirror_coins = max(TITLE_MIRROR_MIN, title_mirror_coins - 1)
+                    if box1.collidepoint(click_pos):
+                        active_field = 0
+                    elif box2.collidepoint(click_pos):
+                        active_field = 1
 
-                if title_coin_rects.get("plus_shared") and title_coin_rects["plus_shared"].collidepoint(click_pos):
-                    title_mirror_coins = min(TITLE_MIRROR_MAX, title_mirror_coins + 1)
+                    if title_coin_rects.get("minus_shared") and title_coin_rects["minus_shared"].collidepoint(click_pos):
+                        title_mirror_coins = max(TITLE_MIRROR_MIN, title_mirror_coins - 1)
 
-                if title_coin_rects.get("online_toggle") and title_coin_rects["online_toggle"].collidepoint(click_pos):
-                    playing_online_enabled = not playing_online_enabled
+                    if title_coin_rects.get("plus_shared") and title_coin_rects["plus_shared"].collidepoint(click_pos):
+                        title_mirror_coins = min(TITLE_MIRROR_MAX, title_mirror_coins + 1)
 
-                if title_coin_rects.get("enter") and title_coin_rects["enter"].collidepoint(click_pos):
-                    state = "game"
+                    if title_coin_rects.get("online_toggle") and title_coin_rects["online_toggle"].collidepoint(click_pos):
+                        playing_online_enabled = not playing_online_enabled
 
-                if title_coin_rects.get("quit") and title_coin_rects["quit"].collidepoint(click_pos):
-                    pygame.quit()
-                    sys.exit()
+                    if title_coin_rects.get("enter") and title_coin_rects["enter"].collidepoint(click_pos):
+                        state = "game"
+
+                    if title_coin_rects.get("quit") and title_coin_rects["quit"].collidepoint(click_pos):
+                        pygame.quit()
+                        sys.exit()
+
+                elif state == "game":
+                    for key, rect in GAME_BUTTONS.items():
+                        if rect.collidepoint(click_pos):
+                            if key == "NEXT":
+                                active_player = 1 - active_player
 
         if state == "title":
             draw_title()
         else:
-            draw_placeholder_game()
+            draw_table_screen()
 
         pygame.display.flip()
         await asyncio.sleep(0)
