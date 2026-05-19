@@ -32,7 +32,7 @@ jobs:
 
       - name: Force fresh archive name
         run: |
-          cp build/web/co-op-connection.tar.gz build/web/phase1-test.tar.gz
+          cp build/web/co-op-connection.tar.gz build/web/full-v10-test.tar.gz
 
           python - <<'PY'
           from pathlib import Path
@@ -42,17 +42,17 @@ jobs:
 
           text = text.replace(
               "co-op-connection.tar.gz",
-              "phase1-test.tar.gz"
+              "full-v10-test.tar.gz"
           )
 
           text = text.replace(
               '"archive":"co-op-connection"',
-              '"archive":"phase1-test"'
+              '"archive":"full-v10-test"'
           )
 
           text = text.replace(
               '"archive": "co-op-connection"',
-              '"archive": "phase1-test"'
+              '"archive": "full-v10-test"'
           )
 
           p.write_text(text)
