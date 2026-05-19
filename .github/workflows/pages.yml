@@ -32,7 +32,7 @@ jobs:
 
       - name: Force fresh archive name
         run: |
-          cp build/web/co-op-connection.tar.gz build/web/debug-main-test.tar.gz
+          cp build/web/co-op-connection.tar.gz build/web/phase1-test.tar.gz
 
           python - <<'PY'
           from pathlib import Path
@@ -42,33 +42,21 @@ jobs:
 
           text = text.replace(
               "co-op-connection.tar.gz",
-              "debug-main-test.tar.gz"
+              "phase1-test.tar.gz"
           )
 
           text = text.replace(
               '"archive":"co-op-connection"',
-              '"archive":"debug-main-test"'
+              '"archive":"phase1-test"'
           )
 
           text = text.replace(
               '"archive": "co-op-connection"',
-              '"archive": "debug-main-test"'
-          )
-
-          text = text.replace(
-              "archive: 'co-op-connection'",
-              "archive: 'debug-main-test'"
-          )
-
-          text = text.replace(
-              'archive: "co-op-connection"',
-              'archive: "debug-main-test"'
+              '"archive": "phase1-test"'
           )
 
           p.write_text(text)
           PY
-
-          grep -n "debug-main-test" build/web/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
