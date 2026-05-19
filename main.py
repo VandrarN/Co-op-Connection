@@ -12,7 +12,7 @@ pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 4 Dice Visual Test")
+pygame.display.set_caption("Co-op Connection Phase 5 Dice + Card Shell Test")
 
 ui_font = pygame.font.SysFont(None, 31)
 small_font = pygame.font.SysFont(None, 26)
@@ -67,6 +67,13 @@ DICE_FACES = ["CASUAL", "SOUL", "SOUL", "FUN", "ASSUMPTION", "COLD", "FREE", "WI
 current_dice_face = "CASUAL"
 dice_roll_timer = 0.0
 dice_rolling = False
+dice_final_face = "CASUAL"
+
+card_visible = False
+card_category = "CASUAL"
+card_text = "Card shell test"
+card_anim_t = 0.0
+card_state = "hidden"
 
 DICE_ICON_FILES = {
     "CASUAL": "Leaf.png",
@@ -321,21 +328,25 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 4: table + player panel + dice roll", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 5: dice actor + card shell", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
+
+
+def ease_out_cubic(t):
+    t = max(0.0, min(1.0, t))
+    return 1 - pow(1 - t, 3)
 
 
 def draw_dice(center):
     x, y = center
     size = 84
-    rect = pygame.Rect(0, 0, size, size)
-    rect.center = (x, y)
 
     lift = 0
     angle = 0
     if dice_rolling:
-        lift = int(22 * abs(pygame.math.Vector2(1, 0).rotate(dice_roll_timer * 720).y))
-        angle = int((dice_roll_timer * 720) % 360)
+        p = max(0.0, min(1.0, dice_roll_timer / 1.15))
+        lift = int(abs(__import__("math").sin(p * __import__("math").pi)) * 72)
+        angle = int((1.0 - ease_out_cubic(p)) * 720)
 
     dice_surf = pygame.Surface((size, size), pygame.SRCALPHA)
     pygame.draw.rect(dice_surf, (250, 244, 232), dice_surf.get_rect(), border_radius=14)
@@ -461,20 +472,26 @@ def draw_table_screen():
 
     players.draw()
     draw_dice((W // 2, H // 2 + 190))
+    draw_card_shell()
 
     for rect in GAME_BUTTONS.values():
         draw_button_hover(rect)
 
-    msg = pygame.font.SysFont(None, 24).render("Phase 4 dice visual test: Roll changes dice face; no cards/content yet", True, (60, 35, 20))
+    msg = pygame.font.SysFont(None, 24).render("Phase 5: Roll, Draw placeholder card, Next changes player", True, (60, 35, 20))
     screen.blit(msg, (14, 1314))
 
 
 
 def start_dice_roll():
-    global dice_rolling, dice_roll_timer, current_dice_face
+    global dice_rolling, dice_roll_timer, current_dice_face, dice_final_face, card_visible, card_state
+    if dice_rolling:
+        return
     dice_rolling = True
     dice_roll_timer = 0.0
+    dice_final_face = random.choice(DICE_FACES)
     current_dice_face = random.choice(DICE_FACES)
+    card_visible = False
+    card_state = "hidden"
 
 
 def update_dice(dt):
@@ -482,12 +499,81 @@ def update_dice(dt):
     if not dice_rolling:
         return
     dice_roll_timer += dt
-    if dice_roll_timer < 0.85:
-        if random.random() < 0.35:
-            current_dice_face = random.choice(DICE_FACES)
+
+    # Controlled face changes, closer to original feel than per-frame random flicker.
+    face_index = int(dice_roll_timer * 14)
+    if dice_roll_timer < 0.95:
+        current_dice_face = DICE_FACES[face_index % len(DICE_FACES)]
     else:
-        current_dice_face = random.choice(DICE_FACES)
+        current_dice_face = dice_final_face
         dice_rolling = False
+
+
+def start_card_shell():
+    global card_visible, card_category, card_text, card_anim_t, card_state
+    if dice_rolling:
+        return
+    card_visible = True
+    card_category = current_dice_face if current_dice_face != "WILDCARD" else "FREE"
+    card_text = f"{card_category} card shell"
+    card_anim_t = 0.0
+    card_state = "fly"
+
+
+def update_card(dt):
+    global card_anim_t, card_state
+    if not card_visible:
+        return
+    if card_state == "fly":
+        card_anim_t += dt
+        if card_anim_t >= 0.45:
+            card_anim_t = 0.45
+            card_state = "idle"
+
+
+def clear_card_and_next_turn():
+    global card_visible, card_state
+    card_visible = False
+    card_state = "hidden"
+    players.swap_turn()
+
+
+def draw_card_shell():
+    if not card_visible:
+        return
+
+    p = max(0.0, min(1.0, card_anim_t / 0.45)) if card_state == "fly" else 1.0
+    e = ease_out_cubic(p)
+
+    start_x, start_y = 450, 1020
+    end_x, end_y = W // 2, H // 2 + 5
+    x = int(start_x + (end_x - start_x) * e)
+    y = int(start_y + (end_y - start_y) * e)
+
+    w, h = 360, 240
+    scale = 0.72 + 0.28 * e
+    sw, sh = int(w * scale), int(h * scale)
+
+    surf = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.rect(surf, (245, 236, 220), surf.get_rect(), border_radius=20)
+    pygame.draw.rect(surf, (210, 188, 160), surf.get_rect().inflate(-8, -8), width=2, border_radius=18)
+
+    icon = get_icon_surface(card_category, 54)
+    surf.blit(icon, icon.get_rect(center=(w // 2, 44)))
+
+    title = ui_font.render(card_category, True, (85, 60, 45))
+    surf.blit(title, title.get_rect(center=(w // 2, 86)))
+
+    body = pygame.font.SysFont(None, 30).render(card_text, True, (55, 40, 30))
+    surf.blit(body, body.get_rect(center=(w // 2, 145)))
+
+    hint = pygame.font.SysFont(None, 24).render("Placeholder card - content not restored yet", True, (95, 70, 50))
+    surf.blit(hint, hint.get_rect(center=(w // 2, 190)))
+
+    if (sw, sh) != (w, h):
+        surf = pygame.transform.smoothscale(surf, (sw, sh))
+
+    screen.blit(surf, surf.get_rect(center=(x, y)).topleft)
 
 
 load_assets()
@@ -566,13 +652,16 @@ async def main():
                         if rect.collidepoint(click_pos):
                             if key == "ROLL":
                                 start_dice_roll()
+                            if key == "DRAW":
+                                start_card_shell()
                             if key == "NEXT":
-                                players.swap_turn()
+                                clear_card_and_next_turn()
                                 active_player = players.active
 
         if state == "game":
             players.update(dt)
             update_dice(dt)
+            update_card(dt)
 
         if state == "title":
             draw_title()
