@@ -3,15 +3,43 @@
 import pygame
 import asyncio
 import sys
+import os
 
 pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Debug Test")
+pygame.display.set_caption("Co-op Connection Phase 1 Background Test")
 
-font_big = pygame.font.SysFont(None, 76, bold=True)
-font_small = pygame.font.SysFont(None, 42, bold=True)
+font_big = pygame.font.SysFont(None, 64, bold=True)
+font_small = pygame.font.SysFont(None, 36, bold=True)
+
+bg = None
+bg_status = "Not loaded yet"
+
+def try_load_background():
+    global bg, bg_status
+
+    candidates = [
+        "StartScreen_BG.png",
+        "assets/StartScreen_BG.png",
+        "./StartScreen_BG.png",
+        "./assets/StartScreen_BG.png",
+    ]
+
+    for path in candidates:
+        try:
+            if os.path.exists(path):
+                img = pygame.image.load(path)
+                bg = pygame.transform.smoothscale(img, (W, H))
+                bg_status = f"Loaded: {path}"
+                return
+        except Exception as e:
+            bg_status = f"Failed: {path} -> {e}"
+
+    bg_status = "StartScreen_BG.png not found"
+
+try_load_background()
 
 async def main():
     while True:
@@ -20,47 +48,16 @@ async def main():
                 pygame.quit()
                 sys.exit()
 
-        screen.fill((170, 35, 185))
-
-        pygame.draw.rect(
-            screen,
-            (255, 245, 120),
-            pygame.Rect(70, 140, W - 140, 260),
-            border_radius=30
-        )
-
-        pygame.draw.rect(
-            screen,
-            (20, 10, 30),
-            pygame.Rect(70, 140, W - 140, 260),
-            width=8,
-            border_radius=30
-        )
-
-        line1 = font_big.render(
-            "PYGAME STARTED",
-            True,
-            (20, 10, 30)
-        )
-
-        line2 = font_small.render(
-            "If you see this, main.py is running.",
-            True,
-            (20, 10, 30)
-        )
-
-        line3 = font_small.render(
-            "Canvas drawing works.",
-            True,
-            (20, 10, 30)
-        )
-
-        screen.blit(line1, line1.get_rect(center=(W // 2, 220)))
-        screen.blit(line2, line2.get_rect(center=(W // 2, 300)))
-        screen.blit(line3, line3.get_rect(center=(W // 2, 355)))
+        if bg:
+            screen.blit(bg, (0, 0))
+        else:
+            screen.fill((170, 35, 185))
+            line1 = font_big.render("BACKGROUND NOT LOADED", True, (255, 245, 120))
+            line2 = font_small.render(bg_status, True, (255, 255, 255))
+            screen.blit(line1, line1.get_rect(center=(W // 2, 240)))
+            screen.blit(line2, line2.get_rect(center=(W // 2, 310)))
 
         pygame.display.flip()
-
         await asyncio.sleep(0)
 
 asyncio.run(main())
