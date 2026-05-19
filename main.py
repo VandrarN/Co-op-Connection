@@ -6,12 +6,13 @@ import sys
 import os
 import io
 import base64
+import random
 
 pygame.init()
 
 W, H = 900, 1350
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Co-op Connection Phase 3B Table Visual Test")
+pygame.display.set_caption("Co-op Connection Phase 4 Dice Visual Test")
 
 ui_font = pygame.font.SysFont(None, 31)
 small_font = pygame.font.SysFont(None, 26)
@@ -61,6 +62,24 @@ _PLAYER_PANEL_IMG = None
 start_bg = None
 table_bg_1 = None
 
+ICON_CACHE = {}
+DICE_FACES = ["CASUAL", "SOUL", "SOUL", "FUN", "ASSUMPTION", "COLD", "FREE", "WILDCARD"]
+current_dice_face = "CASUAL"
+dice_roll_timer = 0.0
+dice_rolling = False
+
+DICE_ICON_FILES = {
+    "CASUAL": "Leaf.png",
+    "SOUL": "Sapphire.png",
+    "FUN": "Sun.png",
+    "HEART": "Heart.png",
+    "HOT": "dice_icon_hot.png",
+    "ASSUMPTION": "dice_icon_assumption.png",
+    "COLD": "dice_icon_cold.png",
+    "FREE": "dice_icon_free.png",
+    "WILDCARD": "Cloud.png",
+}
+
 
 def resource_path(relative):
     candidates = [
@@ -92,6 +111,57 @@ def load_image(filename, alpha=False):
             return img
     except Exception:
         return None
+
+
+
+def crop_alpha(surf):
+    try:
+        mask = pygame.mask.from_surface(surf)
+        rects = mask.get_bounding_rects()
+        if not rects:
+            return surf
+        r = rects[0].copy()
+        for rr in rects[1:]:
+            r.union_ip(rr)
+        cropped = pygame.Surface((r.w, r.h), pygame.SRCALPHA)
+        cropped.blit(surf, (0, 0), area=r)
+        return cropped
+    except Exception:
+        return surf
+
+
+def fit_to_square(surf, square_px, fill=0.90):
+    w, h = surf.get_size()
+    if w <= 0 or h <= 0:
+        return surf
+    target = int(square_px * fill)
+    scale = target / max(w, h)
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+    return pygame.transform.smoothscale(surf, (new_w, new_h))
+
+
+def get_icon_surface(key, size=56):
+    cache_key = (key, size)
+    if cache_key in ICON_CACHE:
+        return ICON_CACHE[cache_key]
+
+    out = pygame.Surface((size, size), pygame.SRCALPHA)
+    filename = DICE_ICON_FILES.get(key)
+    img = load_image(filename, alpha=True) if filename else None
+
+    if img:
+        cropped = crop_alpha(img)
+        fitted = fit_to_square(cropped, size, fill=0.92)
+        out.blit(fitted, fitted.get_rect(center=(size // 2, size // 2)))
+    else:
+        # Safe fallback if any icon fails to load.
+        pygame.draw.circle(out, (235, 210, 140), (size // 2, size // 2), size // 3)
+        txt = pygame.font.SysFont(None, max(14, size // 4), bold=True).render(key[:1], True, (70, 45, 25))
+        out.blit(txt, txt.get_rect(center=(size // 2, size // 2)))
+
+    ICON_CACHE[cache_key] = out
+    return out
 
 
 def cover_scale(img):
@@ -251,20 +321,36 @@ def draw_title():
             pygame.draw.rect(s, (255, 220, 150, 90), s.get_rect(), width=3, border_radius=16)
             screen.blit(s, rect.topleft)
 
-    dbg = pygame.font.SysFont(None, 24).render("Phase 3B: table + player panel", True, (30, 20, 15))
+    dbg = pygame.font.SysFont(None, 24).render("Phase 4: table + player panel + dice roll", True, (30, 20, 15))
     screen.blit(dbg, (14, 1314))
 
 
-def draw_placeholder_dice(center):
+def draw_dice(center):
     x, y = center
     size = 84
     rect = pygame.Rect(0, 0, size, size)
     rect.center = (x, y)
-    pygame.draw.rect(screen, (250, 244, 232), rect, border_radius=14)
-    pygame.draw.rect(screen, (210, 195, 170), rect.inflate(-8, -8), width=2, border_radius=12)
-    dot_color = (75, 55, 40)
-    for dx, dy in [(-20, -20), (20, 20), (0, 0)]:
-        pygame.draw.circle(screen, dot_color, (x + dx, y + dy), 7)
+
+    lift = 0
+    angle = 0
+    if dice_rolling:
+        lift = int(22 * abs(pygame.math.Vector2(1, 0).rotate(dice_roll_timer * 720).y))
+        angle = int((dice_roll_timer * 720) % 360)
+
+    dice_surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    pygame.draw.rect(dice_surf, (250, 244, 232), dice_surf.get_rect(), border_radius=14)
+    pygame.draw.rect(dice_surf, (210, 195, 170), dice_surf.get_rect().inflate(-8, -8), width=2, border_radius=12)
+
+    icon = get_icon_surface(current_dice_face, 58)
+    dice_surf.blit(icon, icon.get_rect(center=(size // 2, size // 2)))
+
+    if dice_rolling:
+        dice_surf = pygame.transform.rotate(dice_surf, angle)
+        draw_rect = dice_surf.get_rect(center=(x, y - lift))
+    else:
+        draw_rect = dice_surf.get_rect(center=(x, y))
+
+    screen.blit(dice_surf, draw_rect.topleft)
 
 
 def draw_button_hover(rect):
@@ -374,13 +460,34 @@ def draw_table_screen():
         screen.blit(msg, msg.get_rect(center=(W // 2, 240)))
 
     players.draw()
-    draw_placeholder_dice((W // 2, H // 2 + 190))
+    draw_dice((W // 2, H // 2 + 190))
 
     for rect in GAME_BUTTONS.values():
         draw_button_hover(rect)
 
-    msg = pygame.font.SysFont(None, 24).render("Phase 3B table visual test: no cards/content logic yet", True, (60, 35, 20))
+    msg = pygame.font.SysFont(None, 24).render("Phase 4 dice visual test: Roll changes dice face; no cards/content yet", True, (60, 35, 20))
     screen.blit(msg, (14, 1314))
+
+
+
+def start_dice_roll():
+    global dice_rolling, dice_roll_timer, current_dice_face
+    dice_rolling = True
+    dice_roll_timer = 0.0
+    current_dice_face = random.choice(DICE_FACES)
+
+
+def update_dice(dt):
+    global dice_rolling, dice_roll_timer, current_dice_face
+    if not dice_rolling:
+        return
+    dice_roll_timer += dt
+    if dice_roll_timer < 0.85:
+        if random.random() < 0.35:
+            current_dice_face = random.choice(DICE_FACES)
+    else:
+        current_dice_face = random.choice(DICE_FACES)
+        dice_rolling = False
 
 
 load_assets()
@@ -457,12 +564,15 @@ async def main():
                 elif state == "game":
                     for key, rect in GAME_BUTTONS.items():
                         if rect.collidepoint(click_pos):
+                            if key == "ROLL":
+                                start_dice_roll()
                             if key == "NEXT":
                                 players.swap_turn()
                                 active_player = players.active
 
         if state == "game":
             players.update(dt)
+            update_dice(dt)
 
         if state == "title":
             draw_title()
