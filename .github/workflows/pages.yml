@@ -28,7 +28,7 @@ jobs:
         run: pip install pygbag
 
       - name: Build portrait web game
-        run: python -m pygbag --build --width 900 --height 1350 --ume_block 0 .
+        run: python -m pygbag --build --width 900 --height 1350 .
 
       - name: Force fresh archive name
         run: |
